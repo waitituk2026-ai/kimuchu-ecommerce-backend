@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin — Orders</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;padding:18px;background:#f7f7f8}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+    th{background:#fafafa}
+    .small{font-size:0.9rem;color:#666}
+    button{padding:6px 10px;border-radius:6px;border:0;cursor:pointer}
+    .paid{color:green;font-weight:700}
+    .notpaid{color:#c00;font-weight:700}
+    .wrap{max-width:1100px;margin:0 auto}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Orders</h1>
+    <p class="small">Shows recent orders. Click "Mark Paid" after successful payment.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Items</th>
+          <th>Total (KES)</th>
+          <th>Phone</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="ordersBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000/api/orders';
+
+    async function fetchOrders() {
+      try {
+        const r = await fetch(API_BASE);
+        const data = await r.json();
+        renderOrders(data);
+      } catch (err) {
+        document.getElementById('ordersBody').innerHTML = '<tr><td colspan="6">Failed to load orders.</td></tr>';
+        console.error(err);
+      }
+    }
+
+    function renderOrders(orders) {
+      const tbody = document.getElementById('ordersBody');
+      if (!orders || orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6">No orders yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = orders.map(order => {
+        const itemsHtml = (order.items || []).map(i => `${i.name} × ${i.qty} (KES ${Number(i.price).toFixed(2)})`).join('<br/>');
+        return `
+          <tr>
+            <td style="max-width:200px;word-break:break-all">${order._id}</td>
+            <td>${itemsHtml}</td>
+            <td>${Number(order.total).toFixed(2)}</td>
+            <td>${order.phone || ''}</td>
+            <td>${order.isPaid ? '<span class="paid">✅ Paid</span>' : '<span class="notpaid">❌ Not Paid</span>'}</td>
+            <td>${order.isPaid ? '' : `<button onclick="markPaid('${order._id}')">Mark Paid</button>`}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function markPaid(orderId) {
+      if (!confirm('Mark order ' + orderId + ' as paid?')) return;
+      try {
+        const r = await fetch(`${API_BASE}/${orderId}/pay`, { method: 'PATCH' });
+        if (!r.ok) {
+          const txt = await r.text();
+          throw new Error(txt || 'Failed');
+        }
+        alert('Order marked as paid ✅');
+        fetchOrders();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to mark paid: ' + err.message);
+      }
+    }
+
+    // init
+    fetchOrders();
+    // optional: refresh every 10s
+    setInterval(fetchOrders, 10000);
+  </script>
+</body>
+</html>
